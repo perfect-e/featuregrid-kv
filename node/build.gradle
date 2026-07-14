@@ -1,0 +1,40 @@
+// ─── node/build.gradle ───────────────────────────────────────────────────────
+// Runnable Spring Boot application that wires the gRPC server + StorageEngine.
+// Exposes gRPC on port 9090 and HTTP actuator on port 8080.
+
+plugins {
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+    }
+}
+
+dependencies {
+    // Project dependencies
+    implementation project(':proto')
+    implementation project(':storage-engine')
+    implementation project(':raft')          // Raft state machine + gRPC transport
+
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // gRPC server integration for Spring Boot
+    implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+
+    // Prometheus metrics
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
+}
+
+// Produce an executable fat JAR (used by Docker)
+bootJar {
+    archiveFileName = 'kv-node.jar'
+}

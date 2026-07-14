@@ -1,0 +1,40 @@
+// ─── coordinator/build.gradle ────────────────────────────────────────────────
+// Spring Boot REST API that acts as the cluster entry point.
+// Routes client requests to the correct node via gRPC stubs.
+
+plugins {
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+    }
+}
+
+dependencies {
+    // Project dependencies (needs proto for gRPC stubs)
+    implementation project(':proto')
+
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // gRPC client (no Spring Boot gRPC server here — just the client channel factory)
+    implementation "io.grpc:grpc-netty-shaded:${grpcVersion}"
+    implementation "io.grpc:grpc-protobuf:${grpcVersion}"
+    implementation "io.grpc:grpc-stub:${grpcVersion}"
+    compileOnly    "javax.annotation:javax.annotation-api:1.3.2"
+
+    // Prometheus metrics
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.3"
+}
+
+bootJar {
+    archiveFileName = 'kv-coordinator.jar'
+}

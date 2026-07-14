@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package kvstore.v1;
+
+option java_package         = "com.kvstore.proto";
+option java_outer_classname = "KvProto";
+option java_multiple_files  = true;
+
+// ─── KV Service ──────────────────────────────────────────────────────────────
+// The core key-value interface exposed by every storage node.
+// The coordinator forwards client calls to the appropriate node's KvService.
+
+service KvService {
+  // Store a key-value pair (overwrites existing value).
+  rpc Put(PutRequest) returns (PutResponse);
+
+  // Retrieve the value for a key. GetResponse.found = false if key not present.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Delete a key (writes a tombstone; key is absent on future reads).
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Health check — returns node ID + status.
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+// ─── Put ─────────────────────────────────────────────────────────────────────
+message PutRequest {
+  string key      = 1;
+  bytes  value    = 2;
+  // Optional TTL in milliseconds. 0 = no expiry (not implemented in Day 1-2).
+  int64  ttl_ms   = 3;
+}
+
+message PutResponse {
+  bool   success = 1;
+  string message = 2;
+  // Monotonic version assigned to this write (useful for conflict detection).
+  int64  version = 3;
+}
+
+// ─── Get ─────────────────────────────────────────────────────────────────────
+message GetRequest {
+  string key = 1;
+}
+
+message GetResponse {
+  bool   found        = 1;
+  bytes  value        = 2;
+  int64  version      = 3;
+  int64  timestamp_ms = 4;
+}
+
+// ─── Delete ──────────────────────────────────────────────────────────────────
+message DeleteRequest {
+  string key = 1;
+}
+
+message DeleteResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// ─── Ping ────────────────────────────────────────────────────────────────────
+message PingRequest {
+  string sender_id = 1;
+}
+
+message PingResponse {
+  string node_id      = 1;
+  string status       = 2;    // "OK" | "DEGRADED"
+  int64  timestamp_ms = 3;
+  int64  key_count    = 4;    // approximate number of live keys
+}

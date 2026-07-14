@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package kvstore.raft;
+
+option java_package         = "com.kvstore.raft.proto";
+option java_outer_classname = "RaftProto";
+option java_multiple_files  = true;
+
+// ─── Raft Consensus Service ───────────────────────────────────────────────────
+// Implements the two core Raft RPCs:
+//   1. RequestVote  — used during leader election (candidate → all peers)
+//   2. AppendEntries — used for heartbeat + log replication (leader → followers)
+
+service RaftService {
+  // Candidate requests a vote from this peer.
+  rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
+
+  // Leader sends heartbeat or replicates log entries to this follower.
+  rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
+}
+
+// ─── Log Entry ────────────────────────────────────────────────────────────────
+// A single command entry in the Raft replicated log.
+message LogEntry {
+  int64  term      = 1;   // Raft term when this entry was created by the leader
+  int64  index     = 2;   // Position in the log (1-indexed)
+  bytes  command   = 3;   // Serialized KV command (PUT / DELETE payload)
+  string commandId = 4;   // Client-assigned idempotency key
+}
+
+// ─── RequestVote ─────────────────────────────────────────────────────────────
+// Sent by a CANDIDATE to all other peers when an election starts.
+message RequestVoteRequest {
+  int64  term           = 1;  // Candidate's current term
+  string candidateId    = 2;  // Node ID of the candidate
+  int64  lastLogIndex   = 3;  // Index of candidate's last log entry
+  int64  lastLogTerm    = 4;  // Term of candidate's last log entry
+}
+
+message RequestVoteResponse {
+  int64 term        = 1;  // Respondent's current term (candidate updates if stale)
+  bool  voteGranted = 2;  // True if respondent voted for the candidate
+}
+
+// ─── AppendEntries ───────────────────────────────────────────────────────────
+// Sent by the LEADER to:
+//   a) Replicate new log entries (entries non-empty)
+//   b) Send a heartbeat (entries empty — just resets follower election timer)
+message AppendEntriesRequest {
+  int64          term         = 1;   // Leader's current term
+  string         leaderId     = 2;   // Lets followers redirect clients
+  int64          prevLogIndex = 3;   // Index of log entry preceding these entries
+  int64          prevLogTerm  = 4;   // Term of prevLogIndex entry
+  repeated LogEntry entries   = 5;   // Empty for heartbeat
+  int64          leaderCommit = 6;   // Leader's current commit index
+}
+
+message AppendEntriesResponse {
+  int64 term    = 1;   // Follower's current term (leader steps down if stale)
+  bool  success = 2;   // True if follower's log matched prevLogIndex/prevLogTerm
+  int64 matchIndex = 3; // Highest log index follower agrees on (for leader tracking)
+}

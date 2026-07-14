@@ -1,0 +1,42 @@
+// ─── Root Build ──────────────────────────────────────────────────────────────
+// Plugin declarations (applied selectively in submodules via apply false)
+// NOTE: plugins {} block requires literal strings — no dynamic versions allowed.
+plugins {
+    id 'java'
+    id 'com.google.protobuf'             version '0.9.4'  apply false
+    id 'org.springframework.boot'        version '3.4.2'  apply false
+    id 'io.spring.dependency-management' version '1.1.6'  apply false
+}
+
+// ─── Common Configuration (all submodules) ──────────────────────────────────
+subprojects {
+    apply plugin: 'java'
+
+    // Target Java 21 bytecode. Works with any JDK >= 21.
+    // Using sourceCompatibility instead of toolchain so the build doesn't
+    // require an exact JDK 21 installation (local dev may have JDK 25).
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    // Common test configuration
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            showStandardStreams = false
+        }
+    }
+
+    // Common dependency versions
+    ext {
+        grpcVersion       = project.property('grpcVersion')
+        protobufVersion   = project.property('protobufVersion')
+        springBootVersion = project.property('springBootVersion')
+    }
+}

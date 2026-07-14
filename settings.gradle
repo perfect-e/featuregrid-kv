@@ -1,0 +1,9 @@
+rootProject.name = 'featuregrid-kv'
+
+// Core modules
+include 'proto'
+include 'storage-engine'
+include 'node'
+include 'coordinator'
+include 'raft'
+include 'client'
