@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: kv-coordinator
+
+server:
+  port: ${COORDINATOR_PORT:8080}
+
+# ─── Cluster topology ──────────────────────────────────────────────────────────
+# All values are overridable via environment variables for Docker Compose.
+kv:
+  cluster:
+    nodes:
+      - id:        node-1
+        host:      ${NODE_1_HOST:localhost}
+        grpc-port: ${NODE_1_GRPC_PORT:9091}
+        http-port: ${NODE_1_HTTP_PORT:8081}
+      - id:        node-2
+        host:      ${NODE_2_HOST:localhost}
+        grpc-port: ${NODE_2_GRPC_PORT:9092}
+        http-port: ${NODE_2_HTTP_PORT:8082}
+      - id:        node-3
+        host:      ${NODE_3_HOST:localhost}
+        grpc-port: ${NODE_3_GRPC_PORT:9093}
+        http-port: ${NODE_3_HTTP_PORT:8083}
+
+# ─── Actuator & Metrics ────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.kvstore: DEBUG

@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: kv-node
+
+# HTTP port — for actuator, health, and Prometheus metrics
+server:
+  port: ${HTTP_PORT:8080}
+
+# gRPC server port — for KvService RPCs from coordinator
+grpc:
+  server:
+    port: ${GRPC_PORT:9090}
+
+# Node configuration
+kv:
+  node:
+    id:                   ${NODE_ID:node-1}
+    data-dir:             ${DATA_DIR:./data/${NODE_ID:node-1}}
+    memtable-max-size-mb: ${MEMTABLE_MAX_MB:4}
+
+    # Raft consensus
+    raft-port: ${RAFT_PORT:9181}
+    # Comma-separated peers in format: nodeId=host:raftPort
+    # e.g. RAFT_PEERS=node-2=localhost:9182,node-3=localhost:9183
+    raft-peers: ${RAFT_PEERS:}
+
+# Actuator — expose health + prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      node: ${NODE_ID:node-1}     # adds node label to all Prometheus metrics
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.kvstore: DEBUG
+    net.devh:    INFO
