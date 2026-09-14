@@ -1,0 +1,150 @@
+{
+  "title": "KV Storage Engine — Day 9 Dashboard",
+  "uid": "kv-engine-day9",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "type": "timeseries",
+      "title": "PUT / GET Latency (p99) — per node",
+      "description": "p99 latency for put and get operations. Spikes indicate disk I/O (SSTable scan or WAL fsync).",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(kv_operation_latency_seconds_bucket{op=\"put\"}[1m]))",
+          "legendFormat": "PUT p99 — {{node}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(kv_operation_latency_seconds_bucket{op=\"get\"}[1m]))",
+          "legendFormat": "GET p99 — {{node}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 2, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "type": "timeseries",
+      "title": "Operations per Second — PUT / GET / DELETE",
+      "description": "Rate of operations reaching each node's gRPC handler.",
+      "targets": [
+        {
+          "expr": "rate(kv_puts_total[1m])",
+          "legendFormat": "PUT/s — {{node}}"
+        },
+        {
+          "expr": "rate(kv_gets_total{result=\"hit\"}[1m])",
+          "legendFormat": "GET hit/s — {{node}}"
+        },
+        {
+          "expr": "rate(kv_gets_total{result=\"miss\"}[1m])",
+          "legendFormat": "GET miss/s — {{node}}"
+        },
+        {
+          "expr": "rate(kv_deletes_total[1m])",
+          "legendFormat": "DELETE/s — {{node}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 3, "gridPos": { "h": 6, "w": 8, "x": 0, "y": 8 },
+      "type": "gauge",
+      "title": "Memtable Fill % — by node",
+      "description": "Percentage of memtable capacity used. At 100%, a flush to SSTable is triggered.",
+      "targets": [
+        { "expr": "kv_memtable_fill_percent", "legendFormat": "{{node}}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 60 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4, "gridPos": { "h": 6, "w": 8, "x": 8, "y": 8 },
+      "type": "stat",
+      "title": "SSTable Count — per node",
+      "description": "Number of SSTable files on disk. Grows on flush, shrinks on compaction. ≥4 files triggers compaction.",
+      "targets": [
+        { "expr": "kv_sstable_count", "legendFormat": "{{node}}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 4 },
+              { "color": "red", "value": 8 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5, "gridPos": { "h": 6, "w": 8, "x": 16, "y": 8 },
+      "type": "timeseries",
+      "title": "WAL File Size — per node",
+      "description": "Write-Ahead Log size. Resets to 0 after each successful SSTable flush.",
+      "targets": [
+        { "expr": "kv_wal_size_bytes", "legendFormat": "WAL — {{node}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 6, "gridPos": { "h": 6, "w": 12, "x": 0, "y": 14 },
+      "type": "gauge",
+      "title": "LRU Cache Hit % — per node",
+      "description": "Read cache hit rate. Higher = fewer SSTable disk reads. Warms up after repeated reads.",
+      "targets": [
+        { "expr": "kv_cache_hit_percent", "legendFormat": "{{node}}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 30 },
+              { "color": "green", "value": 60 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7, "gridPos": { "h": 6, "w": 12, "x": 12, "y": 14 },
+      "type": "stat",
+      "title": "LRU Cache Size — per node",
+      "description": "Number of entries currently in the LRU read cache (max 1000).",
+      "targets": [
+        { "expr": "kv_cache_size", "legendFormat": "{{node}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 8, "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "type": "timeseries",
+      "title": "Coordinator Routing — PUT / GET / DELETE / Errors",
+      "description": "Operations received by the coordinator. Errors indicate node unreachability.",
+      "targets": [
+        { "expr": "rate(coordinator_puts_total[1m])", "legendFormat": "PUT/s" },
+        { "expr": "rate(coordinator_gets_total[1m])", "legendFormat": "GET/s" },
+        { "expr": "rate(coordinator_deletes_total[1m])", "legendFormat": "DELETE/s" },
+        { "expr": "rate(coordinator_errors_total[1m])", "legendFormat": "Errors/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    }
+  ]
+}

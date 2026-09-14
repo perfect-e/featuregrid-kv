@@ -1,0 +1,53 @@
+# ─── Dockerfile.node ─────────────────────────────────────────────────────────
+# Multi-stage build for the KV storage node.
+#   Stage 1: compile with Gradle + JDK
+#   Stage 2: run with slim JRE (no build tools)
+
+# ── Stage 1: Build ───────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /workspace
+
+# Copy Gradle wrapper and dependency config first (layer cache)
+COPY gradlew .
+COPY gradle ./gradle
+COPY gradle.properties .
+COPY settings.gradle .
+COPY build.gradle .
+
+# Copy all subproject build files (needed by Gradle's dependency resolution)
+COPY proto/build.gradle       proto/build.gradle
+COPY storage-engine/build.gradle storage-engine/build.gradle
+COPY raft/build.gradle        raft/build.gradle
+COPY node/build.gradle        node/build.gradle
+COPY coordinator/build.gradle coordinator/build.gradle
+COPY client/build.gradle      client/build.gradle
+
+# Download dependencies before copying source (cached layer)
+RUN ./gradlew :node:dependencies --no-daemon -q || true
+
+# Copy full source
+COPY proto/src       proto/src
+COPY storage-engine/src storage-engine/src
+COPY raft/src        raft/src
+COPY node/src        node/src
+
+# Build the fat JAR
+RUN ./gradlew :node:bootJar --no-daemon -x test
+
+# ── Stage 2: Run ─────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Copy only the fat JAR from the builder stage
+COPY --from=builder /workspace/node/build/libs/kv-node.jar app.jar
+
+# Data directory for WAL and SSTables (mounted as a volume in docker-compose)
+RUN mkdir -p /data
+
+EXPOSE 8080 9090 9181
+
+ENTRYPOINT ["java", \
+  "-Xms256m", "-Xmx512m", \
+  "-jar", "app.jar"]

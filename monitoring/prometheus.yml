@@ -1,0 +1,55 @@
+# ─── monitoring/prometheus.yml ────────────────────────────────────────────────
+# Prometheus scrape configuration for the KV cluster.
+#
+# Scrape targets:
+#   - kv-coordinator   → coordinator-level metrics (routing counters)
+#   - kv-node-1/2/3    → per-node LSM engine metrics (puts, gets, latency,
+#                         memtable, sstable, cache, WAL)
+#
+# Day 9: Node ports corrected to 8081/8082/8083 for local dev.
+# For Docker Compose, targets use service names (node-1, node-2, node-3).
+#
+# Metrics exposed at /actuator/prometheus on each service.
+
+global:
+  scrape_interval:     15s   # How often to scrape targets
+  evaluation_interval: 15s   # How often to evaluate rules
+  scrape_timeout:      10s
+
+# ── Scrape Jobs ───────────────────────────────────────────────────────────────
+scrape_configs:
+
+  # Prometheus self-scrape
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # KV Coordinator (port 8080)
+  - job_name: kv-coordinator
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['localhost:8080']
+        labels:
+          service: coordinator
+
+  # KV Storage Nodes — local dev ports 8081/8082/8083
+  - job_name: kv-nodes
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 'localhost:8081'
+          - 'localhost:8082'
+          - 'localhost:8083'
+        labels:
+          service: kv-node
+
+  # Docker Compose variant — uncomment when running via docker-compose up
+  # - job_name: kv-nodes-docker
+  #   metrics_path: /actuator/prometheus
+  #   static_configs:
+  #     - targets:
+  #         - 'node-1:8080'
+  #         - 'node-2:8080'
+  #         - 'node-3:8080'
+  #       labels:
+  #         service: kv-node

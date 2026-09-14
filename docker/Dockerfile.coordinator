@@ -1,0 +1,54 @@
+# ─── Dockerfile.coordinator ──────────────────────────────────────────────────
+# Multi-stage build for the KV coordinator.
+#
+# Build from project root:
+#   docker build -f docker/Dockerfile.coordinator -t kv-coordinator:latest .
+
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM gradle:8.9-jdk21 AS build
+
+WORKDIR /workspace
+
+COPY gradlew gradlew.bat ./
+COPY gradle/   gradle/
+COPY build.gradle settings.gradle gradle.properties ./
+
+COPY proto/build.gradle        proto/build.gradle
+COPY coordinator/build.gradle  coordinator/build.gradle
+COPY storage-engine/build.gradle storage-engine/build.gradle
+COPY node/build.gradle         node/build.gradle
+COPY raft/build.gradle         raft/build.gradle
+COPY client/build.gradle       client/build.gradle
+
+RUN ./gradlew dependencies --no-daemon -q 2>/dev/null || true
+
+COPY proto/src/        proto/src/
+COPY coordinator/src/  coordinator/src/
+
+RUN ./gradlew :coordinator:bootJar --no-daemon -q
+
+# ── Stage 2: Run ──────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+RUN groupadd -r kvstore && useradd -r -g kvstore kvstore
+USER kvstore
+
+COPY --from=build /workspace/coordinator/build/libs/kv-coordinator.jar app.jar
+
+EXPOSE 8080
+
+ENV COORDINATOR_PORT=8080
+ENV NODE_1_HOST=node-1
+ENV NODE_1_GRPC_PORT=9090
+ENV NODE_2_HOST=node-2
+ENV NODE_2_GRPC_PORT=9090
+ENV NODE_3_HOST=node-3
+ENV NODE_3_GRPC_PORT=9090
+
+ENTRYPOINT ["java", \
+  "-Xms128m", "-Xmx256m", \
+  "-XX:+UseG1GC", \
+  "-Dspring.profiles.active=docker", \
+  "-jar", "app.jar"]

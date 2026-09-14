@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Surfaces — Slate-based 5-step elevation stack */
+    --bg:              #f8fafc; /* slate-50 */
+    --surface-0:       #ffffff; /* white */
+    --surface-1:       #f1f5f9; /* slate-100 */
+    --surface-2:       #e2e8f0; /* slate-200 */
+    --border:          #cbd5e1; /* slate-300 */
+    --border-subtle:   #f1f5f9; /* slate-100 */
+
+    /* Text — Slate-based accessible ratios */
+    --text-1:          #0f172a; /* slate-900 */
+    --text-2:          #334155; /* slate-800 */
+    --text-3:          #475569; /* slate-700 */
+    --text-4:          #64748b; /* slate-500 */
+
+    /* Accent — Indigo/Teal HSL-based with high contrast */
+    --accent-h:        168;
+    --accent:          hsl(var(--accent-h) 84% 30%); /* darker teal for contrast in light mode */
+    --accent-subtle:   hsl(var(--accent-h) 60% 93%);
+    --accent-muted:    hsl(var(--accent-h) 40% 80%);
+
+    /* Semantic */
+    --green:   #15803d; /* green-700 */
+    --green-bg:#dcfce7;
+    --amber:   #b45309; /* amber-700 */
+    --amber-bg:#fef3c7;
+    --red:     #b91c1c; /* red-700 */
+    --red-bg:  #fee2e2;
+    --blue:    #1d4ed8; /* blue-700 */
+    --blue-bg: #dbeafe;
+    --purple:  #6d28d9; /* purple-700 */
+
+    /* Glass (light) */
+    --glass-bg:     rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.07);
+
+    /* Terminal specific variables */
+    --terminal-bg:       #f8fafc;
+    --terminal-header:   #f1f5f9;
+    --terminal-border:   #cbd5e1;
+    --terminal-text:     #0f172a;
+    --terminal-timestamp:#64748b;
+    --terminal-btn-bg:   #ffffff;
+    --terminal-btn-text: #475569;
+    --terminal-btn-active-bg: #e2e8f0;
+    --terminal-btn-active-border: #cbd5e1;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    /* Surfaces */
+    --bg:              #030712; /* gray-950 */
+    --surface-0:       #0b0f19; /* dark slate */
+    --surface-1:       #1e293b; /* slate-800 */
+    --surface-2:       #334155; /* slate-700 */
+    --border:          #334155; /* slate-700 */
+    --border-subtle:   #1e293b; /* slate-800 */
+
+    /* Text */
+    --text-1:          #f8fafc; /* slate-50 */
+    --text-2:          #cbd5e1; /* slate-300 */
+    --text-3:          #94a3b8; /* slate-400 */
+    --text-4:          #64748b; /* slate-500 */
+
+    /* Accent */
+    --accent-h:        168;
+    --accent:          hsl(var(--accent-h) 70% 52%);
+    --accent-subtle:   hsl(var(--accent-h) 60% 12%);
+    --accent-muted:    hsl(var(--accent-h) 40% 25%);
+
+    /* Semantic */
+    --green:   #22c55e;
+    --green-bg:rgba(34,197,94,0.12);
+    --amber:   #f59e0b;
+    --amber-bg:rgba(245,158,11,0.12);
+    --red:     #f87171;
+    --red-bg:  rgba(248,113,113,0.12);
+    --blue:    #60a5fa;
+    --blue-bg: rgba(96,165,250,0.12);
+    --purple:  #a78bfa;
+
+    /* Glass (dark) */
+    --glass-bg:     rgba(15, 18, 24, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.06);
+
+    /* Terminal specific variables */
+    --terminal-bg:       #090d16;
+    --terminal-header:   #05070b;
+    --terminal-border:   #1e293b;
+    --terminal-text:     #e2e8f0;
+    --terminal-timestamp:#475569;
+    --terminal-btn-bg:   #1e293b;
+    --terminal-btn-text: #94a3b8;
+    --terminal-btn-active-bg: #334155;
+    --terminal-btn-active-border: #475569;
+  }
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, fill 0.2s ease, stroke 0.2s ease;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-1);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-4); }
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+@layer utilities {
+
+  /* Card — clean elevation, no blur by default */
+  .card {
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .card-elevated {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+  }
+
+  /* Glass — for navbar only */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+  }
+
+  /* Accent fill */
+  .accent-pill {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border: 1px solid var(--accent-muted);
+    border-radius: 99px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* Subtle inset look for metric tiles */
+  .metric-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Status dot */
+  .dot-live {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 2px var(--green-bg);
+    animation: pulse-dot 2s ease infinite;
+  }
+
+  .dot-dead {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+
+  /* Mono numbers */
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  /* Noise texture overlay for depth */
+  .dark .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.4;
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 2px var(--green-bg); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px var(--green-bg); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ─── Component overrides ────────────────────────────────────────────────── */
+/* Remove Recharts default styles bleeding through */
+.recharts-surface { overflow: visible; }
+.recharts-tooltip-wrapper { z-index: 100; }

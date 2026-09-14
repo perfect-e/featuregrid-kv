@@ -1,0 +1,65 @@
+# ─── Dockerfile.node ─────────────────────────────────────────────────────────
+# Multi-stage build for the KV storage node.
+#
+# Stage 1 (build): Gradle + JDK 21 — compiles everything and produces kv-node.jar
+# Stage 2 (run):   JRE 21 only — minimal runtime image
+#
+# Build from project root:
+#   docker build -f docker/Dockerfile.node -t kv-node:latest .
+
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM gradle:8.9-jdk21 AS build
+
+WORKDIR /workspace
+
+# Copy Gradle wrapper + build files first (layer-cache friendly)
+COPY gradlew gradlew.bat ./
+COPY gradle/   gradle/
+COPY build.gradle settings.gradle gradle.properties ./
+
+# Copy submodule build files
+COPY proto/build.gradle           proto/build.gradle
+COPY storage-engine/build.gradle  storage-engine/build.gradle
+COPY node/build.gradle            node/build.gradle
+COPY raft/build.gradle            raft/build.gradle
+COPY client/build.gradle          client/build.gradle
+COPY coordinator/build.gradle     coordinator/build.gradle
+
+# Resolve dependencies (cached unless build files change)
+RUN ./gradlew dependencies --no-daemon -q 2>/dev/null || true
+
+# Copy all source code
+COPY proto/src/        proto/src/
+COPY storage-engine/src/ storage-engine/src/
+COPY node/src/         node/src/
+
+# Build the node executable JAR
+RUN ./gradlew :node:bootJar --no-daemon -q
+
+# ── Stage 2: Run ──────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+# Non-root user for security
+RUN groupadd -r kvstore && useradd -r -g kvstore kvstore
+USER kvstore
+
+COPY --from=build /workspace/node/build/libs/kv-node.jar app.jar
+
+# HTTP actuator port
+EXPOSE 8080
+# gRPC port
+EXPOSE 9090
+
+# Environment defaults (overridden by docker-compose)
+ENV NODE_ID=node-1
+ENV GRPC_PORT=9090
+ENV HTTP_PORT=8080
+ENV DATA_DIR=/data
+
+ENTRYPOINT ["java", \
+  "-Xms256m", "-Xmx512m", \
+  "-XX:+UseG1GC", \
+  "-Dspring.profiles.active=docker", \
+  "-jar", "app.jar"]

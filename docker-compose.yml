@@ -1,0 +1,190 @@
+# ─── docker-compose.yml ───────────────────────────────────────────────────────
+# Starts the full distributed KV store cluster locally:
+#
+#   coordinator  → REST API on :8080
+#   node-1       → HTTP :8081, gRPC :9091, Raft :9181
+#   node-2       → HTTP :8082, gRPC :9092, Raft :9182
+#   node-3       → HTTP :8083, gRPC :9093, Raft :9183
+#   prometheus   → :9090  (scrapes all 4 services)
+#   grafana      → :3000  (pre-configured datasource → Prometheus)
+#
+# Usage:
+#   docker compose build        # build images (first run or after code change)
+#   docker compose up           # start all services
+#   docker compose down -v      # stop + remove volumes
+#
+# The UI dev server (npm run dev in /ui) can run separately on :5173 and
+# will automatically connect to the coordinator at localhost:8080.
+
+version: '3.9'
+
+networks:
+  kv-net:
+    driver: bridge
+
+volumes:
+  node1-data:
+  node2-data:
+  node3-data:
+  prometheus-data:
+  grafana-data:
+
+services:
+
+  # ── Storage Nodes ───────────────────────────────────────────────────────────
+
+  node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: kv-node-1
+    networks: [kv-net]
+    ports:
+      - "8081:8081"   # HTTP actuator
+      - "9091:9091"   # KvService gRPC
+      - "9181:9181"   # Raft gRPC
+    environment:
+      NODE_ID:         node-1
+      HTTP_PORT:       8081
+      GRPC_PORT:       9091
+      RAFT_PORT:       9181
+      DATA_DIR:        /data/node-1
+      MEMTABLE_MAX_MB: 8
+      RAFT_PEERS:      "node-2=node-2:9182,node-3=node-3:9183"
+    volumes:
+      - node1-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: kv-node-2
+    networks: [kv-net]
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+      - "9182:9182"
+    environment:
+      NODE_ID:         node-2
+      HTTP_PORT:       8082
+      GRPC_PORT:       9092
+      RAFT_PORT:       9182
+      DATA_DIR:        /data/node-2
+      MEMTABLE_MAX_MB: 8
+      RAFT_PEERS:      "node-1=node-1:9181,node-3=node-3:9183"
+    volumes:
+      - node2-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  node-3:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: kv-node-3
+    networks: [kv-net]
+    ports:
+      - "8083:8083"
+      - "9093:9093"
+      - "9183:9183"
+    environment:
+      NODE_ID:         node-3
+      HTTP_PORT:       8083
+      GRPC_PORT:       9093
+      RAFT_PORT:       9183
+      DATA_DIR:        /data/node-3
+      MEMTABLE_MAX_MB: 8
+      RAFT_PEERS:      "node-1=node-1:9181,node-2=node-2:9182"
+    volumes:
+      - node3-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Coordinator ─────────────────────────────────────────────────────────────
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.coordinator
+    container_name: kv-coordinator
+    networks: [kv-net]
+    ports:
+      - "8080:8080"   # REST API
+    environment:
+      KV_CLUSTER_NODES_0_ID:        node-1
+      KV_CLUSTER_NODES_0_HOST:      node-1
+      KV_CLUSTER_NODES_0_GRPC_PORT: 9091
+      KV_CLUSTER_NODES_0_HTTP_PORT: 8081
+      KV_CLUSTER_NODES_1_ID:        node-2
+      KV_CLUSTER_NODES_1_HOST:      node-2
+      KV_CLUSTER_NODES_1_GRPC_PORT: 9092
+      KV_CLUSTER_NODES_1_HTTP_PORT: 8082
+      KV_CLUSTER_NODES_2_ID:        node-3
+      KV_CLUSTER_NODES_2_HOST:      node-3
+      KV_CLUSTER_NODES_2_GRPC_PORT: 9093
+      KV_CLUSTER_NODES_2_HTTP_PORT: 8083
+    depends_on:
+      node-1:
+        condition: service_healthy
+      node-2:
+        condition: service_healthy
+      node-3:
+        condition: service_healthy
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: kv-prometheus
+    networks: [kv-net]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    depends_on:
+      - coordinator
+      - node-1
+      - node-2
+      - node-3
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: kv-grafana
+    networks: [kv-net]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      # Auto-provision Prometheus datasource
+      GF_DATASOURCES_DEFAULT_NAME: Prometheus
+      GF_DATASOURCES_DEFAULT_TYPE: prometheus
+      GF_DATASOURCES_DEFAULT_URL:  http://prometheus:9090
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus

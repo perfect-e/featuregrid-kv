@@ -1,0 +1,39 @@
+# ─── Dockerfile.coordinator ──────────────────────────────────────────────────
+# Multi-stage build for the KV coordinator (REST API + routing + replication).
+
+# ── Stage 1: Build ───────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /workspace
+
+COPY gradlew .
+COPY gradle ./gradle
+COPY gradle.properties .
+COPY settings.gradle .
+COPY build.gradle .
+
+COPY proto/build.gradle       proto/build.gradle
+COPY storage-engine/build.gradle storage-engine/build.gradle
+COPY raft/build.gradle        raft/build.gradle
+COPY node/build.gradle        node/build.gradle
+COPY coordinator/build.gradle coordinator/build.gradle
+COPY client/build.gradle      client/build.gradle
+
+RUN ./gradlew :coordinator:dependencies --no-daemon -q || true
+
+COPY proto/src          proto/src
+COPY coordinator/src    coordinator/src
+
+RUN ./gradlew :coordinator:bootJar --no-daemon -x test
+
+# ── Stage 2: Run ─────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+COPY --from=builder /workspace/coordinator/build/libs/kv-coordinator.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", \
+  "-Xms128m", "-Xmx256m", \
+  "-jar", "app.jar"]

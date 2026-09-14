@@ -1,0 +1,168 @@
+# ─── docker-compose.yml ──────────────────────────────────────────────────────
+# Brings up a full 3-node KV cluster with coordinator, Prometheus, and Grafana.
+#
+# Usage:
+#   docker-compose up --build          # first run (builds images)
+#   docker-compose up                  # subsequent runs
+#   docker-compose down -v             # tear down + remove volumes
+#
+# Endpoints after startup:
+#   REST API:    http://localhost:8080/api/v1/kv/{key}
+#   Prometheus:  http://localhost:9099
+#   Grafana:     http://localhost:3000 (anonymous access, Admin role)
+#   Node metrics: http://localhost:8081/actuator/prometheus (node-1)
+
+version: '3.9'
+
+services:
+
+  # ── Storage Nodes ──────────────────────────────────────────────────────────
+
+  node-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    image: kv-node:latest
+    container_name: kv-node-1
+    environment:
+      NODE_ID:    node-1
+      GRPC_PORT:  9090
+      HTTP_PORT:  8080
+    ports:
+      - "9091:9090"   # gRPC (external port differs to avoid collisions)
+      - "8081:8080"   # HTTP actuator
+    volumes:
+      - node1-data:/data
+    networks:
+      - kv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  node-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    image: kv-node:latest
+    container_name: kv-node-2
+    environment:
+      NODE_ID:    node-2
+      GRPC_PORT:  9090
+      HTTP_PORT:  8080
+    ports:
+      - "9092:9090"
+      - "8082:8080"
+    volumes:
+      - node2-data:/data
+    networks:
+      - kv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  node-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    image: kv-node:latest
+    container_name: kv-node-3
+    environment:
+      NODE_ID:    node-3
+      GRPC_PORT:  9090
+      HTTP_PORT:  8080
+    ports:
+      - "9093:9090"
+      - "8083:8080"
+    volumes:
+      - node3-data:/data
+    networks:
+      - kv-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── Coordinator ────────────────────────────────────────────────────────────
+
+  coordinator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.coordinator
+    image: kv-coordinator:latest
+    container_name: kv-coordinator
+    environment:
+      COORDINATOR_PORT:  8080
+      NODE_1_HOST:       node-1
+      NODE_1_GRPC_PORT:  9090
+      NODE_2_HOST:       node-2
+      NODE_2_GRPC_PORT:  9090
+      NODE_3_HOST:       node-3
+      NODE_3_GRPC_PORT:  9090
+    ports:
+      - "8080:8080"   # Main REST API endpoint
+    depends_on:
+      node-1:
+        condition: service_healthy
+      node-2:
+        condition: service_healthy
+      node-3:
+        condition: service_healthy
+    networks:
+      - kv-network
+    restart: unless-stopped
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    container_name: kv-prometheus
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9099:9090"
+    networks:
+      - kv-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: kv-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED:      "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE:     "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM:     "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/kv-overview.json
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - kv-network
+    restart: unless-stopped
+
+# ── Named Volumes ──────────────────────────────────────────────────────────────
+volumes:
+  node1-data:
+  node2-data:
+  node3-data:
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  kv-network:
+    driver: bridge

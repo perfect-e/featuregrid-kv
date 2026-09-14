@@ -1,0 +1,36 @@
+# Prometheus scrape configuration for the distributed KV store cluster.
+# Scrapes coordinator + all 3 storage nodes every 15 seconds.
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  - job_name: 'kv-coordinator'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['coordinator:8080']
+        labels:
+          service: 'coordinator'
+
+  - job_name: 'kv-node-1'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['node-1:8081']
+        labels:
+          service: 'node-1'
+
+  - job_name: 'kv-node-2'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['node-2:8082']
+        labels:
+          service: 'node-2'
+
+  - job_name: 'kv-node-3'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['node-3:8083']
+        labels:
+          service: 'node-3'
